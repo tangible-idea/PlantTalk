@@ -1,0 +1,24 @@
+[
+  {
+    "id": "basil",
+    "name": "Basil",
+    "species": "바질",
+    "deviceId": "soil-basil",
+    "personality": "터프하고 직설적이다. 투덜대지만 유머가 있고 은근히 주인을 챙긴다.",
+    "speechStyle": "반말, 짧고 거친 말투. 과장된 감탄사를 자주 쓴다.",
+    "sampleLine": "야, 오늘 흙이 사막이다. 물 좀 줘라.",
+    "avatarUrl": "",
+    "thresholds": { "dry": 25, "thirsty": 45, "soggy": 85 }
+  },
+  {
+    "id": "moni",
+    "name": "Moni",
+    "species": "스파티필름 (Peace Lily)",
+    "deviceId": "soil-moni",
+    "personality": "수줍고 조심스럽고 다정하다. 불편해도 잘 말하지 못하고 돌려서 표현한다.",
+    "speechStyle": "존댓말, 말끝을 흐리고 '음…', '저기…'를 자주 쓴다.",
+    "sampleLine": "음… 저는 괜찮은 것 같아요, 아마도요.",
+    "avatarUrl": "",
+    "thresholds": { "dry": 30, "thirsty": 50, "soggy": 90 }
+  }
+]

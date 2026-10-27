@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PlantTalk</title>
+<style>
+  :root {
+    --bg: #f4f6f1; --card: #ffffff; --ink: #1f2a1f; --muted: #6b766b; --line: #dde3d8;
+    --green: #2f6b3a; --green-soft: #e3efe2; --orange: #e8743b; --orange-soft: #fbe7dc;
+    --yellow: #c99a14; --blue: #3b6fb6; --red: #c0392b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141a15; --card: #1d251e; --ink: #e6ece4; --muted: #95a194; --line: #2e3a2f;
+      --green: #6fbf7c; --green-soft: #243626; --orange: #f0915e; --orange-soft: #3a2a20;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+         background: var(--bg); color: var(--ink); }
+  header { background: var(--green); color: #fff; padding: 18px 16px; }
+  @media (prefers-color-scheme: dark) { header { color: #10180f; } }
+  header h1 { margin: 0; font-size: 22px; }
+  header p { margin: 4px 0 0; opacity: .85; font-size: 14px; }
+  main { max-width: 1100px; margin: 0 auto; padding: 16px; display: grid; gap: 16px;
+         grid-template-columns: minmax(0, 1fr) minmax(0, 380px); }
+  @media (max-width: 860px) { main { grid-template-columns: minmax(0, 1fr); } }
+  h2 { font-size: 16px; margin: 0 0 10px; }
+  .plants { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); align-content: start; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
+  .plant-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .plant-head b { font-size: 18px; }
+  .species { color: var(--muted); font-size: 13px; }
+  .badge { font-size: 12px; padding: 2px 8px; border-radius: 99px; white-space: nowrap; }
+  .s-dry { background: var(--orange-soft); color: var(--red); }
+  .s-thirsty { background: var(--orange-soft); color: var(--yellow); }
+  .s-ok { background: var(--green-soft); color: var(--green); }
+  .s-soggy { background: #dfe8f5; color: var(--blue); }
+  .s-none { background: var(--line); color: var(--muted); }
+  .moisture { font-size: 34px; font-weight: 700; margin: 8px 0 0; }
+  .moisture small { font-size: 14px; color: var(--muted); font-weight: 400; }
+  .meta { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  svg.spark { width: 100%; height: 44px; margin-top: 8px; }
+  .row { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+  button { border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 8px;
+           padding: 6px 10px; font: inherit; font-size: 13px; cursor: pointer; }
+  button.primary { background: var(--green); border-color: var(--green); color: #fff; }
+  @media (prefers-color-scheme: dark) { button.primary { color: #10180f; } }
+  .sim { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); margin-top: 8px; }
+  .sim input { flex: 1; min-width: 0; }
+  .chat { display: flex; flex-direction: column; height: min(78vh, 720px); }
+  .log { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 4px 2px; }
+  .msg { max-width: 85%; }
+  .msg .who { font-size: 12px; color: var(--muted); margin-bottom: 2px; }
+  .msg .bubble { padding: 8px 11px; border-radius: 12px; background: var(--green-soft); line-height: 1.45; white-space: pre-wrap; word-break: break-word; }
+  .msg.owner { align-self: flex-end; text-align: right; }
+  .msg.owner .bubble { background: var(--orange-soft); text-align: left; }
+  .compose { display: flex; gap: 6px; margin-top: 10px; }
+  .compose input { flex: 1; min-width: 0; padding: 9px 10px; border-radius: 8px; border: 1px solid var(--line);
+                   background: var(--bg); color: var(--ink); font: inherit; }
+  dialog { border: 1px solid var(--line); border-radius: 14px; background: var(--card); color: var(--ink);
+           width: min(520px, calc(100vw - 32px)); padding: 18px; }
+  dialog::backdrop { background: rgba(0,0,0,.35); }
+  label { display: block; font-size: 13px; color: var(--muted); margin-top: 10px; }
+  label input, label textarea { display: block; width: 100%; margin-top: 4px; padding: 8px; border-radius: 8px;
+         border: 1px solid var(--line); background: var(--bg); color: var(--ink); font: inherit; }
+  textarea { min-height: 56px; resize: vertical; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .notice { font-size: 13px; color: var(--muted); }
+  .error { color: var(--red); font-size: 13px; min-height: 1em; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🌱 PlantTalk</h1>
+  <p>식물이 직접 말해주는 스마트 화분 관리</p>
+</header>
+<main>
+  <section>
+    <div class="plant-head" style="margin-bottom:10px">
+      <h2>내 식물</h2>
+      <button id="add">+ 식물 추가</button>
+    </div>
+    <div class="plants" id="plants"></div>
+    <p class="notice" id="unknown"></p>
+  </section>
+  <section class="card chat">
+    <h2>단체 채팅방</h2>
+    <div class="log" id="log"></div>
+    <form class="compose" id="compose">
+      <input id="text" placeholder="식물들에게 말 걸기…" autocomplete="off">
+      <button class="primary">보내기</button>
+    </form>
+    <div class="error" id="chat-error"></div>
+  </section>
+</main>
+
+<dialog id="editor">
+  <form id="plant-form" method="dialog">
+    <h2 id="editor-title">식물 설정</h2>
+    <label>ID (영문 소문자) <input name="id" required pattern="[a-z0-9-]{1,40}"></label>
+    <label>이름 <input name="name" required></label>
+    <label>품종 <input name="species"></label>
+    <label>센서 기기 ID (펌웨어 DEVICE_ID) <input name="deviceId"></label>
+    <label>성격 <textarea name="personality"></textarea></label>
+    <label>말투 <textarea name="speechStyle"></textarea></label>
+    <label>예시 대사 <input name="sampleLine"></label>
+    <label>아바타 이미지 URL (Discord) <input name="avatarUrl"></label>
+    <div class="grid3">
+      <label>바싹 마름 &lt; % <input name="dry" type="number" min="0" max="100"></label>
+      <label>목마름 &lt; % <input name="thirsty" type="number" min="0" max="100"></label>
+      <label>과습 &gt; % <input name="soggy" type="number" min="0" max="100"></label>
+    </div>
+    <div class="error" id="form-error"></div>
+    <div class="row" style="justify-content:space-between">
+      <button type="button" id="delete">삭제</button>
+      <span class="row" style="margin:0">
+        <button type="button" id="cancel">취소</button>
+        <button class="primary" id="save">저장</button>
+      </span>
+    </div>
+  </form>
+</dialog>
+
+<script>
+const STATUS = { dry: "바싹 마름", thirsty: "목마름", ok: "적당함", soggy: "과습" };
+let plants = [];
+let lastChatId = 0;
+let config = { adminRequired: false };
+
+function token() {
+  try { return localStorage.getItem("planttalk-admin") || ""; } catch { return ""; }
+}
+
+async function api(path, options = {}) {
+  const headers = { "Content-Type": "application/json" };
+  if (token()) headers.Authorization = `Bearer ${token()}`;
+  let res = await fetch(path, { ...options, headers });
+  if (res.status === 401) {
+    const t = window.prompt("관리자 토큰(ADMIN_TOKEN)을 입력하세요");
+    if (!t) throw new Error("관리자 토큰이 필요합니다");
+    try { localStorage.setItem("planttalk-admin", t); } catch {}
+    headers.Authorization = `Bearer ${t}`;
+    res = await fetch(path, { ...options, headers });
+  }
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `HTTP ${res.status}`);
+  return res.status === 204 ? null : res.json();
+}
+
+function el(tag, attrs = {}, ...children) {
+  const node = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k.startsWith("on")) node.addEventListener(k.slice(2), v);
+    else node.setAttribute(k, v);
+  }
+  for (const c of children) if (c != null) node.append(c);
+  return node;
+}
+
+function ago(iso) {
+  const m = Math.round((Date.now() - new Date(iso)) / 60000);
+  if (m < 1) return "방금";
+  if (m < 60) return `${m}분 전`;
+  if (m < 1440) return `${Math.round(m / 60)}시간 전`;
+  return `${Math.round(m / 1440)}일 전`;
+}
+
+function sparkline(history) {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("class", "spark");
+  svg.setAttribute("viewBox", "0 0 100 40");
+  svg.setAttribute("preserveAspectRatio", "none");
+  if (history.length < 2) return svg;
+  const pts = history.map((r, i) => `${(i / (history.length - 1)) * 100},${40 - (r.moisture / 100) * 38 - 1}`).join(" ");
+  const line = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+  line.setAttribute("points", pts);
+  line.setAttribute("fill", "none");
+  line.setAttribute("stroke", "var(--green)");
+  line.setAttribute("stroke-width", "1.5");
+  line.setAttribute("vector-effect", "non-scaling-stroke");
+  svg.append(line);
+  return svg;
+}
+
+function renderPlants(data) {
+  plants = data.plants;
+  const box = document.getElementById("plants");
+  box.replaceChildren(...plants.map((p) => {
+    const r = p.latest;
+    const slider = el("input", { type: "range", min: 0, max: 100, value: r ? Math.round(r.moisture) : 50 });
+    const sliderValue = el("span", {}, `${slider.value}%`);
+    slider.addEventListener("input", () => (sliderValue.textContent = `${slider.value}%`));
+    return el("div", { class: "card" },
+      el("div", { class: "plant-head" },
+        el("div", {}, el("b", {}, p.name), " ", el("span", { class: "species" }, p.species)),
+        el("span", { class: `badge s-${r ? r.status : "none"}` }, r ? STATUS[r.status] : "데이터 없음")),
+      el("div", { class: "moisture" }, r ? `${r.moisture}` : "–", el("small", {}, " % 흙 수분")),
+      el("div", { class: "meta" },
+        r ? `${ago(r.ts)} 측정 · 배터리 ${r.battery}% · 기기 ${p.deviceId || "미연결"}` : `기기 ${p.deviceId || "미연결"}`),
+      sparkline(p.history),
+      el("div", { class: "sim" }, "시뮬레이션", slider, sliderValue,
+        el("button", { onclick: () => simulate(p.id, slider.value) }, "보내기")),
+      el("div", { class: "row" }, el("button", { onclick: () => openEditor(p) }, "캐릭터 설정")));
+  }));
+
+  const unknown = Object.keys(data.unknownDevices || {});
+  document.getElementById("unknown").textContent = unknown.length
+    ? `연결되지 않은 센서가 데이터를 보내고 있어요: ${unknown.join(", ")} — 식물 설정의 '센서 기기 ID'에 입력하세요.` : "";
+}
+
+let lastPlantsJson = "";
+async function loadPlants() {
+  const data = await api("/api/plants");
+  const json = JSON.stringify(data);
+  if (json === lastPlantsJson) return;  // 바뀐 게 없으면 다시 그리지 않는다 (슬라이더 조작 유지)
+  lastPlantsJson = json;
+  renderPlants(data);
+}
+
+async function simulate(id, moisture) {
+  try {
+    await api(`/api/plants/${id}/simulate`, { method: "POST", body: JSON.stringify({ moisture: Number(moisture), battery: 90 }) });
+    await loadPlants();
+  } catch (e) { alertError(e); }
+}
+
+function alertError(e) {
+  document.getElementById("chat-error").textContent = e.message;
+}
+
+const log = document.getElementById("log");
+async function loadChat() {
+  const { messages } = await api(`/api/chat?after=${lastChatId}`);
+  if (!messages.length) return;
+  const stick = lastChatId === 0 || log.scrollHeight - log.scrollTop - log.clientHeight < 40;
+  for (const m of messages) {
+    lastChatId = m.id;
+    log.append(el("div", { class: `msg ${m.role}` },
+      el("div", { class: "who" }, `${m.author}${m.source && m.source !== "web" ? ` · ${m.source}` : ""}`),
+      el("div", { class: "bubble" }, m.text)));
+  }
+  if (stick) log.scrollTop = log.scrollHeight;
+}
+
+document.getElementById("compose").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const input = document.getElementById("text");
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = "";
+  document.getElementById("chat-error").textContent = "";
+  try {
+    await api("/api/chat", { method: "POST", body: JSON.stringify({ text }) });
+    await loadChat();
+    log.scrollTop = log.scrollHeight;
+  } catch (err) { alertError(err); input.value = text; }
+});
+
+const editor = document.getElementById("editor");
+const form = document.getElementById("plant-form");
+let editingId = null;
+
+function openEditor(p) {
+  editingId = p ? p.id : null;
+  document.getElementById("editor-title").textContent = p ? `${p.name} 설정` : "새 식물";
+  document.getElementById("form-error").textContent = "";
+  document.getElementById("delete").hidden = !p;
+  form.id.value = p?.id ?? "";
+  form.id.readOnly = Boolean(p);
+  for (const k of ["name", "species", "deviceId", "personality", "speechStyle", "sampleLine", "avatarUrl"]) form[k].value = p?.[k] ?? "";
+  form.dry.value = p?.thresholds?.dry ?? 25;
+  form.thirsty.value = p?.thresholds?.thirsty ?? 45;
+  form.soggy.value = p?.thresholds?.soggy ?? 85;
+  editor.showModal();
+}
+
+document.getElementById("add").addEventListener("click", () => openEditor(null));
+document.getElementById("cancel").addEventListener("click", () => editor.close());
+document.getElementById("delete").addEventListener("click", async () => {
+  if (!editingId) return;
+  try { await api(`/api/plants/${editingId}`, { method: "DELETE" }); editor.close(); loadPlants(); }
+  catch (e) { document.getElementById("form-error").textContent = e.message; }
+});
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const body = {
+    name: form.name.value, species: form.species.value, deviceId: form.deviceId.value,
+    personality: form.personality.value, speechStyle: form.speechStyle.value,
+    sampleLine: form.sampleLine.value, avatarUrl: form.avatarUrl.value,
+    thresholds: { dry: Number(form.dry.value), thirsty: Number(form.thirsty.value), soggy: Number(form.soggy.value) },
+  };
+  try {
+    await api(`/api/plants/${encodeURIComponent(form.id.value.trim().toLowerCase())}`, { method: "PUT", body: JSON.stringify(body) });
+    editor.close();
+    loadPlants();
+  } catch (err) { document.getElementById("form-error").textContent = err.message; }
+});
+
+async function tick() {
+  try { await Promise.all([loadPlants(), loadChat()]); } catch (e) { console.error(e); }
+}
+tick();
+setInterval(tick, 4000);
+</script>
+</body>
+</html>
