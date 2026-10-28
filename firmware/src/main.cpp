@@ -2,6 +2,8 @@
 //
 // 한 번 깨어날 때마다: 센서 측정 -> LED 로 상태 표시 -> Wi-Fi 로 서버에 전송 -> deep sleep.
 // 서버가 응답으로 다음 측정까지의 sleep 시간을 내려준다.
+// Wi-Fi 가 안 되면 BLE 모드로 들어간다. 근처 맥의 서버(BLE_ENABLED=1)가 연결하면
+// BLE_INTERVAL_SEC 마다 측정값을 notify 한다. 이 모드에서는 deep sleep 하지 않는다(배터리 소모 큼).
 //
 // 핀 배치는 Seeed 공식 factory 펌웨어(ESPHome YAML)를 따른다.
 //   D0  GPIO0   배터리 전압 ADC (AA 1개)
@@ -13,19 +15,37 @@
 //
 // 버튼: 1번 누르면 즉시 측정/전송, 3번 연속 누르면 보정(calibration) 모드.
 
-#include <Arduino.h>
-#include <ArduinoJson.h>
-#include <HTTPClient.h>
-#include <Preferences.h>
-#include <WiFi.h>
-#include <WiFiClientSecure.h>
-#include "driver/rtc_io.h"
-#include "esp_sleep.h"
-
 #if __has_include("config.h")
 #include "config.h"
 #else
 #error "include/config.example.h 를 include/config.h 로 복사하고 값을 채우세요"
+#endif
+
+// 예전 config.h 에는 없는 값이라 기본값을 둔다.
+#ifndef USE_WIFI
+#define USE_WIFI 1
+#endif
+#ifndef USE_BLE
+#define USE_BLE 1
+#endif
+#ifndef BLE_INTERVAL_SEC
+#define BLE_INTERVAL_SEC 30
+#endif
+
+#include <Arduino.h>
+#include <Preferences.h>
+#include "driver/rtc_io.h"
+#include "esp_sleep.h"
+#if USE_WIFI
+#include <ArduinoJson.h>
+#include <HTTPClient.h>
+#include <WiFi.h>
+#include <WiFiClientSecure.h>
+#endif
+#if USE_BLE
+#include <BLE2902.h>
+#include <BLEDevice.h>
+#include <BLEServer.h>
 #endif
 
 #define FW_VERSION "0.1.0"
@@ -40,8 +60,9 @@ constexpr int PIN_LED_RED = 20;
 constexpr int PIN_LED_YELLOW = 18;
 
 constexpr uint32_t PWM_FREQ = 200000;
-constexpr uint8_t PWM_BITS = 8;
-constexpr uint32_t PWM_DUTY = 174;  // 68% (factory 펌웨어와 동일)
+// C6 의 LEDC 는 40MHz 클럭이라 200kHz 에서는 7비트(128단계)까지만 된다. 8비트면 설정이 실패한다.
+constexpr uint8_t PWM_BITS = 7;
+constexpr uint32_t PWM_DUTY = 87;  // 87/128 = 68% (factory 펌웨어와 동일)
 
 // factory 펌웨어 기본 보정값 (V). 실제 화분에서 보정하면 NVS 에 저장된다.
 constexpr float DEFAULT_DRY_V = 2.75f;
@@ -52,6 +73,9 @@ constexpr uint32_t DEFAULT_SLEEP_SEC = 30 * 60;
 constexpr uint32_t OFFLINE_SLEEP_SEC = 15 * 60;
 constexpr uint32_t MIN_SLEEP_SEC = 60;
 constexpr uint32_t MAX_SLEEP_SEC = 12 * 60 * 60;
+// server/src/ble.js 의 UUID 와 같아야 한다
+#define BLE_SERVICE_UUID "7a1e0001-b5a3-4f2c-9a1d-6c0f3e8b2d41"
+#define BLE_READING_UUID "7a1e0002-b5a3-4f2c-9a1d-6c0f3e8b2d41"
 
 RTC_DATA_ATTR uint32_t bootCount = 0;
 
@@ -181,6 +205,7 @@ int countButtonPresses() {
   return presses;
 }
 
+#if USE_WIFI
 bool connectWifi() {
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
@@ -244,6 +269,94 @@ uint32_t upload(const Reading& r, const char* wakeReason) {
   http.end();
   return sleepSec;
 }
+#endif
+
+#if USE_BLE
+volatile bool bleConnected = false;
+volatile bool bleJustConnected = false;
+
+class BleCallbacks : public BLEServerCallbacks {
+  void onConnect(BLEServer*) override {
+    bleConnected = true;
+    bleJustConnected = true;
+  }
+  void onDisconnect(BLEServer*) override {
+    bleConnected = false;
+    BLEDevice::startAdvertising();  // 다시 연결을 기다린다
+  }
+};
+
+// 값 배치는 server/src/ble.js 주석과 같다.
+void notifyReading(BLECharacteristic* ch, const Reading& r, uint8_t wake) {
+  uint8_t pkt[9];
+  auto put16 = [&](int at, uint32_t v) {
+    pkt[at] = v & 0xFF;
+    pkt[at + 1] = (v >> 8) & 0xFF;
+  };
+  pkt[0] = 1;  // 버전
+  put16(1, (uint32_t)lroundf(r.moisture * 10));
+  put16(3, (uint32_t)lroundf(r.soilV * 1000));
+  put16(5, (uint32_t)lroundf(r.batteryV * 1000));
+  pkt[7] = (uint8_t)lroundf(r.battery);
+  pkt[8] = wake;
+  ch->setValue(pkt, sizeof(pkt));
+  if (bleConnected) ch->notify();
+}
+
+Reading measureNow() {
+  sensorPower(true);
+  Reading r = measure();
+  sensorPower(false);
+  Serial.printf("[soil] %.3fV -> %.1f%%  battery %.3fV (%.0f%%)\n", r.soilV, r.moisture, r.batteryV,
+                r.battery);
+  return r;
+}
+
+// 돌아오지 않는다. 연결돼 있는 동안 BLE_INTERVAL_SEC 마다, 버튼을 누르면 바로 보낸다.
+[[noreturn]] void bleStream(Reading first, esp_sleep_wakeup_cause_t cause) {
+  BLEDevice::init(DEVICE_ID);
+  BLEServer* server = BLEDevice::createServer();
+  server->setCallbacks(new BleCallbacks());
+  BLEService* svc = server->createService(BLE_SERVICE_UUID);
+  BLECharacteristic* ch = svc->createCharacteristic(
+      BLE_READING_UUID, BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
+  ch->addDescriptor(new BLE2902());
+  svc->start();
+  BLEAdvertising* adv = BLEDevice::getAdvertising();
+  adv->addServiceUUID(BLE_SERVICE_UUID);
+  adv->setScanResponse(true);  // 이름(DEVICE_ID)은 scan response 에 들어간다
+  BLEDevice::startAdvertising();
+  Serial.println("[ble] advertising, waiting for connection");
+
+  Reading r = first;
+  uint8_t wake = cause == ESP_SLEEP_WAKEUP_TIMER ? 1 : (cause == ESP_SLEEP_WAKEUP_EXT1 ? 2 : 0);
+  notifyReading(ch, r, wake);
+  uint32_t lastSent = millis();
+  bool wasDown = digitalRead(PIN_BUTTON) == LOW;  // 깨울 때 누른 버튼은 무시
+
+  while (true) {
+    bool down = digitalRead(PIN_BUTTON) == LOW;
+    bool pressed = down && !wasDown;
+    wasDown = down;
+
+    if (bleJustConnected) {
+      bleJustConnected = false;
+      Serial.println("[ble] connected");
+      blink(PIN_LED_GREEN, 2, 100, 100);
+      delay(1000);  // 맥이 notify 구독을 마칠 시간
+      notifyReading(ch, r, wake);  // 연결되자마자 최신 값을 보낸다
+      lastSent = millis();
+    }
+    if (pressed || millis() - lastSent >= BLE_INTERVAL_SEC * 1000UL) {
+      r = measureNow();
+      if (pressed) showMoistureLed(r.moisture);
+      notifyReading(ch, r, pressed ? 2 : 1);
+      lastSent = millis();
+    }
+    delay(20);
+  }
+}
+#endif
 
 void goToSleep(uint32_t seconds) {
   if (seconds < MIN_SLEEP_SEC) seconds = MIN_SLEEP_SEC;
@@ -252,8 +365,10 @@ void goToSleep(uint32_t seconds) {
   Serial.flush();
 
   allLedsOff();
+#if USE_WIFI
   WiFi.disconnect(true);
   WiFi.mode(WIFI_OFF);
+#endif
 
   esp_sleep_enable_timer_wakeup((uint64_t)seconds * 1000000ULL);
   rtc_gpio_pullup_en((gpio_num_t)PIN_BUTTON);
@@ -290,11 +405,18 @@ void setup() {
   showMoistureLed(r.moisture);
 
   uint32_t sleepSec = 0;
+#if USE_WIFI
   if (connectWifi()) {
     sleepSec = upload(r, wakeReasonName(cause));
   } else {
     Serial.println("[wifi] connect timeout");
   }
+  WiFi.disconnect(true);
+  WiFi.mode(WIFI_OFF);  // BLE 와 동시에 켜 두지 않는다
+#endif
+#if USE_BLE
+  if (sleepSec == 0) bleStream(r, cause);
+#endif
   if (sleepSec == 0) {
     blink(PIN_LED_RED, 3, 100, 100);  // 전송 실패 표시
     sleepSec = OFFLINE_SLEEP_SEC;

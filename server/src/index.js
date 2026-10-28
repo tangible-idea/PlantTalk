@@ -1,6 +1,7 @@
 import express from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { startBleReceiver } from "./ble.js";
 import { planReplies } from "./brain.js";
 import { createHub } from "./hub.js";
 import { createDiscordMessenger } from "./messengers/discord.js";
@@ -12,6 +13,7 @@ const PORT = Number(process.env.PORT || 8787);
 const DEVICE_TOKEN = process.env.DEVICE_TOKEN || "";
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || "";
 const OWNER = process.env.OWNER_NAME || "주인";
+const BLE_ENABLED = process.env.BLE_ENABLED === "1";
 
 const store = createStore();
 
@@ -60,6 +62,7 @@ function ingestReading(plant, body) {
     batteryVoltage: toNumber(body.batteryVoltage),
     rssi: toNumber(body.rssi),
     wakeReason: typeof body.wakeReason === "string" ? body.wakeReason : null,
+    transport: body.transport === "ble" ? "ble" : "wifi",
     status: classify(plant, moisture),
   };
   const prev = store.latestReading(plant.id);
@@ -98,16 +101,21 @@ app.get("/api/config", (req, res) => {
   res.json({ adminRequired: Boolean(ADMIN_TOKEN), owner: OWNER, messengers: messengers.map((m) => m.name) });
 });
 
-// 펌웨어가 깨어날 때마다 호출한다.
-app.post("/api/readings", requireDevice, (req, res) => {
-  const deviceId = String(req.body.deviceId ?? "");
+// Wi-Fi(HTTP) 와 BLE 가 같이 쓴다.
+function deviceReading(body) {
+  const deviceId = String(body.deviceId ?? "");
   const plant = store.plantByDevice(deviceId);
   if (!plant) {
-    store.noteUnknownDevice(deviceId, { ts: new Date().toISOString(), ...req.body });
+    store.noteUnknownDevice(deviceId, { ts: new Date().toISOString(), ...body });
     console.warn(`[readings] unknown device: ${deviceId}`);
-    return res.json({ status: "unknown-device", sleepSeconds: DEFAULT_SLEEP_SECONDS });
+    return { status: "unknown-device", sleepSeconds: DEFAULT_SLEEP_SECONDS };
   }
-  const result = ingestReading(plant, req.body);
+  return ingestReading(plant, body);
+}
+
+// 펌웨어가 깨어날 때마다 호출한다.
+app.post("/api/readings", requireDevice, (req, res) => {
+  const result = deviceReading(req.body);
   if (result.error) return res.status(400).json(result);
   res.json(result);
 });
@@ -153,6 +161,14 @@ app.post("/api/chat", requireAdmin, (req, res) => {
 });
 
 await hub.start();
+if (BLE_ENABLED) {
+  await startBleReceiver({
+    onReading(body) {
+      const result = deviceReading(body);
+      if (result.error) console.warn(`[ble] ${body.deviceId}: ${result.error}`);
+    },
+  });
+}
 app.listen(PORT, () => {
   console.log(`PlantTalk server on http://localhost:${PORT}`);
   if (!DEVICE_TOKEN) console.warn("DEVICE_TOKEN 이 비어 있어 아무 기기나 측정값을 보낼 수 있습니다.");

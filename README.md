@@ -5,7 +5,7 @@
 "ESP32-Based Messaging Plant" 기획을 바탕으로 하되, 센서는 DHT22 + AS7341 + OLED 대신 **Seeed Studio XIAO Soil Moisture Sensor**(XIAO ESP32-C6 내장, AA 건전지 1개) 하나로 구성했다.
 
 ```
-[XIAO Soil Sensor] --Wi-Fi/HTTP--> [PlantTalk 서버] --Claude--> 식물 대사 --> [Discord 채널 / 웹 대시보드]
+[XIAO Soil Sensor] --Wi-Fi/HTTP 또는 BLE--> [PlantTalk 서버] --Claude--> 식물 대사 --> [Discord 채널 / 웹 대시보드]
   측정 → LED 표시 → 전송 → deep sleep      상태 해석, 이벤트 감지              주인이 말 걸면 식물들이 답장
 ```
 
@@ -29,7 +29,7 @@ server/     Node 20+ 서버: API, 상태 해석, Claude 대사 생성, Discord �
 
 ### 서버 흐름
 
-1. 기기가 `POST /api/readings`로 측정값을 보낸다.
+1. 기기가 `POST /api/readings`로 측정값을 보낸다. Wi-Fi가 없으면 서버를 실행 중인 맥이 BLE로 기기에 연결해 값을 계속 받는다(아래 "BLE 수신").
 2. `status.js`가 식물별 기준치로 상태를 정한다: `dry` / `thirsty` / `ok` / `soggy`. 상태가 바뀌었는지, 물을 줬는지(수분 +15%p 이상), 배터리가 부족한지도 감지한다.
 3. 알릴 일이 생기면 `brain.js`가 Claude(`claude-opus-5-5`)를 한 번 호출한다. 식물들의 페르소나, 센서 값, 최근 채팅을 넘기면 "누가, 무슨 말을 할지"가 JSON으로 돌아온다.
 4. `hub.js`가 답장을 채팅 기록에 남기고, 연결된 모든 메신저로 보낸다.
@@ -52,6 +52,18 @@ npm start              # http://localhost:8787
 - 서버를 외부에 공개한다면 `ADMIN_TOKEN`을 반드시 설정한다. 설정하지 않으면 누구나 페르소나를 바꾸고 Claude 호출(비용)을 일으킬 수 있다.
 - 데이터는 `server/data/db.json`에 저장된다. 처음 실행하면 `plants.example.json`의 Basil과 Moni가 들어간다.
 - 테스트: `npm test`
+
+### BLE 수신 (Wi-Fi 없을 때, 선택)
+
+센서가 Wi-Fi에 연결하지 못하면 BLE 모드로 들어가 PlantTalk 서비스를 광고한다. 서버를 센서 근처(약 10m)의 맥에서 돌리면 서버가 센서에 연결하고, 연결이 유지되는 동안 센서가 `BLE_INTERVAL_SEC`(기본 30초)마다 측정값을 보낸다. 받은 값은 Wi-Fi로 받은 것과 똑같이 처리된다.
+
+1. `server/.env`에 `BLE_ENABLED=1`을 넣고 `npm install`로 `@stoprocent/noble`을 설치한다(optional 의존성).
+2. `npm start`. 처음 실행할 때 macOS가 터미널의 블루투스 접근을 물어보면 허용한다. 로그에 `[ble] scanning`이 보이면 연결을 기다리는 중이다.
+3. 연결되면 센서의 초록 LED가 2번 깜빡이고 서버 로그에 `[ble] <DEVICE_ID> connected`가 찍힌다. 연결이 끊기면 센서가 다시 광고하고 서버가 다시 붙는다.
+
+- 아직 인증이 없다. 근처의 누구나 같은 서비스로 값을 보낼 수 있다.
+- BLE 모드에서는 deep sleep을 하지 않아 AA 건전지가 며칠 만에 닳는다. 테스트할 때는 USB 전원을 쓴다.
+- 패킷 구조는 `server/src/ble.js` 주석에 있다.
 
 ### Discord 단체 채팅 연결 (선택)
 
@@ -78,6 +90,8 @@ npm start              # http://localhost:8787
 
 ### 빌드와 업로드
 
+저장소 루트에서 `make esp` 한 번으로 설정 파일 생성, 빌드, 업로드, 시리얼 로그까지 끝난다. `config.h`가 없으면 BLE 전용(`USE_WIFI 0`, `DEVICE_ID=soil-basil`)으로 만든다. 서버는 `make server`(BLE 수신 켬)로 띄운다. 직접 하려면:
+
 ```bash
 cd firmware
 cp include/config.example.h include/config.h   # Wi-Fi, 서버 주소, DEVICE_TOKEN, DEVICE_ID
@@ -86,12 +100,15 @@ pio device monitor
 ```
 
 - `DEVICE_ID`는 대시보드에서 식물의 "센서 기기 ID"에 입력한다. 아직 연결하지 않은 기기가 데이터를 보내면 대시보드에 표시된다.
+- Wi-Fi와 BLE를 같이 넣으면 기본 앱 파티션(1.3MB)을 넘기 때문에 `huge_app.csv`(앱 3MB, OTA 없음)를 쓴다.
 - ESP32-C6는 Arduino core 3.x가 필요해서 `platformio.ini`에서 [pioarduino](https://github.com/pioarduino/platform-espressif32) 플랫폼을 쓴다.
 - 이 펌웨어를 올리면 Seeed factory 펌웨어(ESPHome / Home Assistant 연동)는 지워진다. 되돌리려면 [Seeed 위키](https://wiki.seeedstudio.com/xiao_soil_moisture_sensor/)의 factory 펌웨어를 다시 올린다.
 
 ### 동작
 
-- 깨어날 때마다 측정 → LED 1회 표시 → 서버 전송 → 서버가 정한 시간만큼 deep sleep. 전송에 실패하면 빨강 LED가 3번 깜빡이고 15분 뒤 다시 시도한다.
+- 깨어날 때마다 측정 → LED 1회 표시 → 서버 전송 → 서버가 정한 시간만큼 deep sleep.
+- Wi-Fi 전송에 실패하면 BLE 모드로 들어가 리셋할 때까지 머문다. 맥이 연결하면 30초마다, 버튼을 누르면 바로 측정값을 보낸다. BLE도 끈 상태(`USE_BLE 0`)에서 실패하면 빨강 LED가 3번 깜빡이고 15분 뒤 다시 시도한다.
+- Wi-Fi가 없는 곳에서는 `config.h`의 `USE_WIFI`를 0으로 두면 바로 BLE 모드로 들어간다.
 - **버튼 1번**: 바로 측정하고 전송한다. 서버는 이걸 "주인이 직접 확인했다"는 이벤트로 받아 식물이 한마디 한다.
 - **버튼 3번 연속**: 보정(calibration).
   1. 빨강 LED가 깜빡이는 10초 동안 센서를 마른 흙(또는 공기 중)에 둔다.
