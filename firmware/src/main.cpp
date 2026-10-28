@@ -29,7 +29,7 @@
 #define USE_BLE 1
 #endif
 #ifndef BLE_INTERVAL_SEC
-#define BLE_INTERVAL_SEC 30
+#define BLE_INTERVAL_SEC 5
 #endif
 
 #include <Arduino.h>
@@ -88,6 +88,7 @@ struct Reading {
   float moisture;  // 0~100 %
   float batteryV;
   float battery;   // 0~100 %
+  float chipTemp;  // ESP32-C6 내장 온도 센서 (°C). 칩 온도라 실내 기온보다 높게 나온다
 };
 
 void setLed(int pin, bool on) { digitalWrite(pin, on ? HIGH : LOW); }
@@ -138,6 +139,7 @@ Reading measure() {
   r.batteryV = readVolts(PIN_BATTERY, 10);
   // factory 펌웨어 기준: 1.0V 이하면 방전, 1.5V 가 완충
   r.battery = clampPercent((r.batteryV - 1.0f) / 0.5f * 100.0f);
+  r.chipTemp = temperatureRead();
   return r;
 }
 
@@ -288,17 +290,21 @@ class BleCallbacks : public BLEServerCallbacks {
 
 // 값 배치는 server/src/ble.js 주석과 같다.
 void notifyReading(BLECharacteristic* ch, const Reading& r, uint8_t wake) {
-  uint8_t pkt[9];
+  uint8_t pkt[15];
   auto put16 = [&](int at, uint32_t v) {
     pkt[at] = v & 0xFF;
     pkt[at + 1] = (v >> 8) & 0xFF;
   };
-  pkt[0] = 1;  // 버전
+  pkt[0] = 2;  // 버전
   put16(1, (uint32_t)lroundf(r.moisture * 10));
   put16(3, (uint32_t)lroundf(r.soilV * 1000));
   put16(5, (uint32_t)lroundf(r.batteryV * 1000));
   pkt[7] = (uint8_t)lroundf(r.battery);
   pkt[8] = wake;
+  put16(9, (uint16_t)(int16_t)lroundf(r.chipTemp * 10));
+  uint32_t uptime = millis() / 1000;
+  put16(11, uptime & 0xFFFF);
+  put16(13, uptime >> 16);
   ch->setValue(pkt, sizeof(pkt));
   if (bleConnected) ch->notify();
 }
@@ -307,8 +313,8 @@ Reading measureNow() {
   sensorPower(true);
   Reading r = measure();
   sensorPower(false);
-  Serial.printf("[soil] %.3fV -> %.1f%%  battery %.3fV (%.0f%%)\n", r.soilV, r.moisture, r.batteryV,
-                r.battery);
+  Serial.printf("[soil] %.3fV -> %.1f%%  battery %.3fV (%.0f%%)  chip %.1fC\n", r.soilV, r.moisture,
+                r.batteryV, r.battery, r.chipTemp);
   return r;
 }
 

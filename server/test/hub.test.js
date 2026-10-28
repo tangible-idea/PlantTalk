@@ -6,7 +6,7 @@ import { test } from "node:test";
 import { createHub } from "../src/hub.js";
 import { createStore } from "../src/store.js";
 
-function setup(planReplies) {
+function setup(planReplies, context) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "planttalk-"));
   const store = createStore(path.join(dir, "db.json"));
   const sent = [];
@@ -17,7 +17,7 @@ function setup(planReplies) {
       sent.push(`${plant.name}: ${text}`);
     },
   };
-  return { store, sent, hub: createHub({ store, planReplies, messengers: [messenger] }) };
+  return { store, sent, hub: createHub({ store, planReplies, messengers: [messenger], context }) };
 }
 
 test("owner message gets plant replies in chat log and messengers", async () => {
@@ -46,4 +46,17 @@ test("a failing Claude call does not break the queue", async () => {
   await hub.ownerMessage({ author: "주인", text: "1", source: "web" });
   await hub.ownerMessage({ author: "주인", text: "2", source: "web" });
   assert.deepEqual(sent, ["Basil: 살았다"]);
+});
+
+test("morning greeting passes the outdoor context to Claude", async () => {
+  let seen;
+  const { sent, hub } = setup(async (args) => {
+    seen = args;
+    return [{ plantId: "basil", text: "좋은 아침. 밖에 춥다더라" }];
+  }, () => "Outdoor weather in 서울: 맑음");
+
+  await hub.morning();
+  assert.equal(seen.trigger.type, "morning");
+  assert.equal(seen.context, "Outdoor weather in 서울: 맑음");
+  assert.deepEqual(sent, ["Basil: 좋은 아침. 밖에 춥다더라"]);
 });

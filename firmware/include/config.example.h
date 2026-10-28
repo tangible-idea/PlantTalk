@@ -6,7 +6,7 @@
 // Wi-Fi 가 없는 곳이면 USE_WIFI 0 으로 두어 연결 대기(최대 15초)를 건너뛴다.
 #define USE_WIFI 1
 #define USE_BLE 1
-#define BLE_INTERVAL_SEC 30
+#define BLE_INTERVAL_SEC 5
 
 #define WIFI_SSID "your-ssid"
 #define WIFI_PASSWORD "your-password"

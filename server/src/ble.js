@@ -5,22 +5,24 @@
 // 인증은 아직 없다. 근처의 누구나 같은 서비스로 값을 보낼 수 있다.
 //
 // READING 값 (little-endian, 펌웨어 bleStream() 과 같아야 한다)
-//   0     버전 (1)
+//   0     버전 (2. 버전 1 은 8번까지만 있다)
 //   1-2   moisture  u16  x10 (%)
 //   3-4   soil      u16  mV
 //   5-6   battery   u16  mV
 //   7     battery   u8   %
 //   8     wake      u8   0 boot / 1 timer / 2 button
+//   9-10  chipTemp  i16  x10 (°C) ESP32-C6 내장 온도 센서. 실내 기온이 아니다
+//   11-14 uptime    u32  초
 
 export const SERVICE_UUID = "7a1e0001b5a34f2c9a1d6c0f3e8b2d41";
 export const READING_UUID = "7a1e0002b5a34f2c9a1d6c0f3e8b2d41";
 
-const VERSION = 1;
 const WAKE_REASONS = ["boot", "timer", "button"];
 
 export function parseReading(deviceId, data) {
-  if (!data || data.length < 9 || data[0] !== VERSION) return null;
-  return {
+  const version = data?.[0];
+  if (!(version === 1 && data.length >= 9) && !(version === 2 && data.length >= 15)) return null;
+  const body = {
     deviceId,
     moisture: data.readUInt16LE(1) / 10,
     soilVoltage: data.readUInt16LE(3) / 1000,
@@ -29,6 +31,11 @@ export function parseReading(deviceId, data) {
     wakeReason: WAKE_REASONS[data[8]] ?? "timer",
     transport: "ble",
   };
+  if (version >= 2) {
+    body.chipTemp = data.readInt16LE(9) / 10;
+    body.uptime = data.readUInt32LE(11);
+  }
+  return body;
 }
 
 // noble 은 optionalDependency 라 없거나 블루투스가 꺼져 있으면 경고만 남기고 넘어간다.

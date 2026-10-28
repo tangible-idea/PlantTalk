@@ -67,6 +67,8 @@ npm start              # http://localhost:8787
 
 ### Discord 단체 채팅 연결 (선택)
 
+기본 채팅방은 대시보드 오른쪽의 웹 채팅이다. 메신저처럼 아바타, 시간, 입력 중 표시가 있고 Enter로 보낸다. Discord는 `.env`에 값을 넣을 때만 켜지는 부가 기능이다.
+
 1. [Discord Developer Portal](https://discord.com/developers/applications)에서 봇을 만들고 **Message Content Intent**를 켠다. 그다음 서버에 초대한다(권한: 채널 보기, 메시지 읽기).
 2. 식물들이 대화할 채널에서 **설정 → 연동 → 웹후크**를 만들고 URL을 복사한다.
 3. `.env`에 `DISCORD_BOT_TOKEN`, `DISCORD_CHANNEL_ID`, `DISCORD_WEBHOOK_URL`을 채운다.
@@ -115,8 +117,16 @@ pio device monitor
   2. 초록 LED가 깜빡이는 10초 동안 물을 충분히 준 흙에 꽂는다.
   3. 성공하면 초록 LED가 빠르게 5번 깜빡이고, 값이 NVS에 저장된다.
 
+### 날씨와 아침 인사
+
+- 서버가 30분마다 [Open-Meteo](https://open-meteo.com/)에서 바깥 날씨(지금, 오늘, 내일)를 받아 Claude에게 함께 넘긴다. 식물은 필요할 때 날씨를 대화에 섞고, 주인이 날씨를 물으면 답한다. 화분 자리에서 잰 값이 아니라는 점은 프롬프트에 적어 두었다.
+- 매일 7~9시 사이 무작위 시각에 식물이 날씨와 함께 먼저 아침 인사를 한다. 인사한 날짜를 저장해서 서버를 다시 켜도 하루 한 번만 한다.
+- 위치는 `.env`의 `WEATHER_LAT` / `WEATHER_LON`. 비워 두면 서버 공인 IP로 도시 단위 위치를 찾는다(ipwho.is, 실패하면 서울). `WEATHER_ENABLED=0`, `MORNING_GREETING=0`으로 끌 수 있다.
+- 대기질: 같은 Open-Meteo에서 PM10/PM2.5를 받아 환경부 등급(좋음/보통/나쁨/매우나쁨)으로 넘긴다.
+- 기상청 단기예보(선택): `.env`에 `KMA_SERVICE_KEY`(공공데이터포털 "기상청_단기예보 조회서비스" Decoding 키)를 넣으면 동네 단위 예보(오늘·내일 최저/최고, 비 오는 시간, 앞으로 12시간)를 함께 넘긴다.
+- 공휴일: date.nager.at(키 없음)에서 공휴일을 받아 오늘·내일이 쉬는 날인지, 다음 공휴일이 언제인지 넘긴다.
+
 ## 확장 아이디어
 
-- 온도와 빛 정보: 지역 날씨 API(예: Open-Meteo)를 서버에서 붙이면 센서 없이도 "오늘 덥다" 같은 맥락을 줄 수 있다.
 - 물 주기 알림: `dry` 상태가 일정 시간 이상 계속되면 식물이 다시 조른다.
 - 일일 요약: 하루 한 번 식물들이 그날의 상태를 수다처럼 정리한다.
