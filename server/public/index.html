@@ -5,67 +5,151 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PlantTalk</title>
 <style>
+  /* 글꼴과 색은 udo 앱(Paperlogy + Barlow Condensed, 연녹색 바탕 + 라임 포인트)을 따른다.
+     글꼴은 SIL OFL 1.1 (public/fonts/*-OFL.txt), 한글 음절·기본 기호만 남긴 woff2 */
+  @font-face { font-family: Paperlogy; src: url(fonts/Paperlogy-4Regular.woff2) format("woff2"); font-weight: 400; font-display: swap; }
+  @font-face { font-family: Paperlogy; src: url(fonts/Paperlogy-5Medium.woff2) format("woff2"); font-weight: 500; font-display: swap; }
+  @font-face { font-family: Paperlogy; src: url(fonts/Paperlogy-6SemiBold.woff2) format("woff2"); font-weight: 600; font-display: swap; }
+  @font-face { font-family: Paperlogy; src: url(fonts/Paperlogy-7Bold.woff2) format("woff2"); font-weight: 700 900; font-display: swap; }
+  @font-face { font-family: BarlowCondensed; src: url(fonts/BarlowCondensed-SemiBold.woff2) format("woff2"); font-weight: 600; font-display: swap; }
+
   :root {
-    --bg: #f4f6f1; --card: #ffffff; --ink: #1f2a1f; --muted: #6b766b; --line: #dde3d8;
-    --green: #2f6b3a; --green-soft: #e3efe2; --orange: #e8743b; --orange-soft: #fbe7dc;
-    --yellow: #c99a14; --blue: #3b6fb6; --red: #c0392b;
+    --bg: #f4f6f3; --card: #ffffff; --ink: #17211d; --muted: #68756d; --line: #e1e7de;
+    --green: #426b31; --lime: #cafa68; --on-lime: #17211d; --selection: #f0f7e8;
+    --teal: #327d80; --amber: #916020; --warning: #fff4e3; --red: #b23a2e; --red-soft: #fdecea; --teal-soft: #e5f2f2;
+    --chart-moisture: #2e8540; --chart-battery: #7b5bb5;
+    --chat-bg: #eef2ec; --mine: var(--lime); --mine-ink: var(--on-lime); --theirs: #ffffff;
+    --shadow: 0 1px 2px rgba(23, 33, 29, .04), 0 8px 24px rgba(23, 33, 29, .04);
+    --font: Paperlogy, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif;
+    --num: BarlowCondensed, Paperlogy, sans-serif;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #141a15; --card: #1d251e; --ink: #e6ece4; --muted: #95a194; --line: #2e3a2f;
-      --green: #6fbf7c; --green-soft: #243626; --orange: #f0915e; --orange-soft: #3a2a20;
+      --bg: #0c1311; --card: #151d1b; --ink: #e8eee9; --muted: #93a098; --line: #26302c;
+      --green: #9bcb7e; --selection: #1d2a20;
+      --teal: #6fb9bb; --amber: #e0a85a; --warning: #2e2617; --red: #f08a7e; --red-soft: #3a1f1c; --teal-soft: #17292a;
+      --chart-moisture: #4fa85e; --chart-battery: #9273d6;
+      --chat-bg: #101816; --theirs: #1d2724;
+      --shadow: none;
     }
   }
   * { box-sizing: border-box; }
-  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
-         background: var(--bg); color: var(--ink); }
-  header { background: var(--green); color: #fff; padding: 18px 16px; }
-  @media (prefers-color-scheme: dark) { header { color: #10180f; } }
-  header h1 { margin: 0; font-size: 22px; }
-  header p { margin: 4px 0 0; opacity: .85; font-size: 14px; }
-  main { max-width: 1100px; margin: 0 auto; padding: 16px; display: grid; gap: 16px;
-         grid-template-columns: minmax(0, 1fr) minmax(0, 380px); }
-  @media (max-width: 860px) { main { grid-template-columns: minmax(0, 1fr); } }
-  h2 { font-size: 16px; margin: 0 0 10px; }
-  .plants { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); align-content: start; }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
-  .plant-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-  .plant-head b { font-size: 18px; }
-  .species { color: var(--muted); font-size: 13px; }
-  .badge { font-size: 12px; padding: 2px 8px; border-radius: 99px; white-space: nowrap; }
-  .s-dry { background: var(--orange-soft); color: var(--red); }
-  .s-thirsty { background: var(--orange-soft); color: var(--yellow); }
-  .s-ok { background: var(--green-soft); color: var(--green); }
-  .s-soggy { background: #dfe8f5; color: var(--blue); }
-  .s-none { background: var(--line); color: var(--muted); }
-  .moisture { font-size: 34px; font-weight: 700; margin: 8px 0 0; }
-  .moisture small { font-size: 14px; color: var(--muted); font-weight: 400; }
-  .meta { color: var(--muted); font-size: 12px; margin-top: 2px; }
-  svg.spark { width: 100%; height: 44px; margin-top: 8px; }
-  .row { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
-  button { border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 8px;
-           padding: 6px 10px; font: inherit; font-size: 13px; cursor: pointer; }
-  button.primary { background: var(--green); border-color: var(--green); color: #fff; }
-  @media (prefers-color-scheme: dark) { button.primary { color: #10180f; } }
-  .sim { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); margin-top: 8px; }
-  .sim input { flex: 1; min-width: 0; }
-  .chat { display: flex; flex-direction: column; height: min(78vh, 720px); }
-  .log { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 4px 2px; }
-  .msg { max-width: 85%; }
-  .msg .who { font-size: 12px; color: var(--muted); margin-bottom: 2px; }
-  .msg .bubble { padding: 8px 11px; border-radius: 12px; background: var(--green-soft); line-height: 1.45; white-space: pre-wrap; word-break: break-word; }
-  .msg.owner { align-self: flex-end; text-align: right; }
-  .msg.owner .bubble { background: var(--orange-soft); text-align: left; }
-  .compose { display: flex; gap: 6px; margin-top: 10px; }
-  .compose input { flex: 1; min-width: 0; padding: 9px 10px; border-radius: 8px; border: 1px solid var(--line);
-                   background: var(--bg); color: var(--ink); font: inherit; }
-  dialog { border: 1px solid var(--line); border-radius: 14px; background: var(--card); color: var(--ink);
-           width: min(520px, calc(100vw - 32px)); padding: 18px; }
-  dialog::backdrop { background: rgba(0,0,0,.35); }
-  label { display: block; font-size: 13px; color: var(--muted); margin-top: 10px; }
-  label input, label textarea { display: block; width: 100%; margin-top: 4px; padding: 8px; border-radius: 8px;
-         border: 1px solid var(--line); background: var(--bg); color: var(--ink); font: inherit; }
-  textarea { min-height: 56px; resize: vertical; }
+  body { margin: 0; font-family: var(--font); background: var(--bg); color: var(--ink);
+         letter-spacing: -0.01em; -webkit-font-smoothing: antialiased; }
+  .num { font-family: var(--num); font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: 0; }
+
+  header { max-width: 1140px; margin: 0 auto; padding: 22px 20px 6px; display: flex; align-items: center; gap: 12px; }
+  .logo { width: 40px; height: 40px; border-radius: 13px; background: var(--lime); display: grid; place-items: center; font-size: 21px; }
+  header h1 { margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.03em; }
+  header p { margin: 1px 0 0; color: var(--muted); font-size: 13px; }
+  .weather { margin-left: auto; display: flex; align-items: center; gap: 10px; background: var(--card); border: 1px solid var(--line);
+             border-radius: 16px; padding: 7px 14px; font-size: 12px; color: var(--muted); }
+  .weather[hidden] { display: none; }
+  .weather .num { font-size: 22px; color: var(--ink); line-height: 1; }
+  .weather b { color: var(--ink); font-weight: 600; font-size: 13px; display: block; }
+  main { max-width: 1140px; margin: 0 auto; padding: 16px 20px 28px; display: grid; gap: 20px;
+         grid-template-columns: minmax(0, 1fr) minmax(0, 400px); }
+  @media (max-width: 880px) { main { grid-template-columns: minmax(0, 1fr); padding: 12px 16px 24px; } header { padding: 18px 16px 2px; } }
+  h2 { font-size: 17px; font-weight: 700; margin: 0; letter-spacing: -0.02em; }
+  .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+
+  .plants { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); align-content: start; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 22px; padding: 18px; box-shadow: var(--shadow); }
+  .plant-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .plant-head b { font-size: 19px; font-weight: 700; letter-spacing: -0.02em; }
+  .species { color: var(--muted); font-size: 13px; margin-left: 4px; }
+  .badge { font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 99px; white-space: nowrap; }
+  .s-dry { background: var(--red-soft); color: var(--red); }
+  .s-thirsty { background: var(--warning); color: var(--amber); }
+  .s-ok { background: var(--selection); color: var(--green); }
+  .s-soggy { background: var(--teal-soft); color: var(--teal); }
+  .s-none { background: var(--bg); color: var(--muted); }
+  .moisture { display: flex; align-items: baseline; gap: 6px; margin: 12px 0 2px; }
+  .moisture .num { font-size: 52px; line-height: 1; }
+  .moisture small { font-size: 14px; color: var(--muted); }
+  .meta { color: var(--muted); font-size: 12px; margin-top: 3px; line-height: 1.5; }
+  .meta .num { font-size: 13px; color: var(--ink); }
+
+  /* 카드 안 작은 추이 그래프 (흙 수분, 배터리 각각 따로. 축 하나 = 0~100%) */
+  .mini { margin-top: 14px; position: relative; }
+  .mini-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; color: var(--muted); }
+  .mini-head b { font-family: var(--num); font-weight: 600; font-size: 16px; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .mini-head .key { display: inline-block; width: 12px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+  .mini svg { display: block; width: 100%; height: 46px; margin-top: 6px; overflow: visible; cursor: crosshair; }
+  .mini .range { font-size: 11px; color: var(--muted); display: flex; justify-content: space-between; margin-top: 3px; }
+  .mini .tip { position: absolute; top: 20px; transform: translateX(-50%); pointer-events: none; white-space: nowrap;
+               background: var(--ink); color: var(--card); font-size: 12px; padding: 4px 8px; border-radius: 8px; }
+
+  .no-data { margin-top: 14px; padding: 18px 12px; border: 1px dashed var(--line); border-radius: 14px; text-align: center;
+             color: var(--muted); font-size: 12px; line-height: 1.6; white-space: pre-line; }
+  .row { display: flex; gap: 6px; margin-top: 14px; flex-wrap: wrap; }
+  button { border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 12px;
+           padding: 7px 12px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; transition: background .15s, border-color .15s; }
+  button:hover { background: var(--selection); border-color: var(--selection); }
+  button.primary { background: var(--lime); border-color: var(--lime); color: var(--on-lime); border-radius: 16px; font-weight: 700; }
+  button.primary:hover { filter: brightness(.96); }
+  button:focus-visible, textarea:focus-visible, input:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+  .sim { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); margin-top: 14px;
+         padding: 10px 12px; background: var(--bg); border-radius: 14px; }
+  .sim input { flex: 1; min-width: 0; accent-color: var(--green); }
+  .sim .num { color: var(--ink); font-size: 14px; min-width: 32px; text-align: right; }
+  .sim button { padding: 5px 10px; }
+
+  /* 채팅방 */
+  .chat { display: flex; flex-direction: column; height: min(84vh, 780px); padding: 0; overflow: hidden; position: sticky; top: 16px; }
+  @media (max-width: 880px) { .chat { position: static; } }
+  .chat-head { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+  .chat-head .title { font-weight: 700; font-size: 16px; letter-spacing: -0.02em; }
+  .chat-head .sub { font-size: 12px; color: var(--muted); margin-top: 1px; }
+  .members { display: flex; margin-left: auto; }
+  .members .avatar { width: 30px; height: 30px; font-size: 15px; margin-left: -7px; border: 2px solid var(--card); position: relative; overflow: visible; }
+  .members .dot { position: absolute; right: -3px; bottom: -3px; width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--card); }
+  .dot.s-dry { background: var(--red); } .dot.s-thirsty { background: var(--amber); }
+  .dot.s-ok { background: var(--green); } .dot.s-soggy { background: var(--teal); } .dot.s-none { background: var(--muted); }
+  .log { flex: 1; overflow-y: auto; padding: 14px 14px 8px; background: var(--chat-bg); display: flex; flex-direction: column; }
+  .day { align-self: center; font-size: 11px; color: var(--muted); background: var(--card); border-radius: 99px;
+         padding: 4px 12px; margin: 12px 0 6px; }
+  .msg { display: flex; gap: 8px; align-items: flex-start; margin-top: 12px; max-width: 100%; }
+  .msg.cont { margin-top: 4px; }
+  .msg[hidden] { display: none; }
+  .msg.cont .avatar { visibility: hidden; height: 0; }
+  .avatar { flex: none; width: 38px; height: 38px; border-radius: 14px; display: grid; place-items: center;
+            font-size: 19px; overflow: hidden; color: #fff; }
+  .avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .msg .body { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; }
+  .msg .who { font-size: 12px; font-weight: 600; color: var(--muted); margin: 0 0 4px 2px; }
+  .msg .line { display: flex; align-items: flex-end; gap: 5px; max-width: 100%; }
+  .bubble { padding: 9px 13px; border-radius: 4px 16px 16px 16px; background: var(--theirs); line-height: 1.5;
+            white-space: pre-wrap; word-break: keep-all; overflow-wrap: anywhere; max-width: min(76vw, 300px); font-size: 14px;
+            box-shadow: 0 1px 1px rgba(23, 33, 29, .05); }
+  .msg.cont .bubble { border-radius: 16px; }
+  .time { flex: none; font-size: 10px; color: var(--muted); padding-bottom: 3px; }
+  .msg.owner { flex-direction: row-reverse; }
+  .msg.owner .body { align-items: flex-end; }
+  .msg.owner .line { flex-direction: row-reverse; }
+  .msg.owner .bubble { background: var(--mine); color: var(--mine-ink); border-radius: 16px 4px 16px 16px; box-shadow: none; }
+  .msg.owner.cont .bubble { border-radius: 16px; }
+  .typing { display: flex; gap: 4px; padding: 12px 14px; }
+  .typing i { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); animation: blink 1.2s infinite; }
+  .typing i:nth-child(2) { animation-delay: .2s; } .typing i:nth-child(3) { animation-delay: .4s; }
+  @keyframes blink { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { .typing i { animation: none; opacity: .6; } }
+  .empty { margin: auto; text-align: center; color: var(--muted); font-size: 13px; white-space: pre-line; line-height: 1.6; }
+  .compose { display: flex; gap: 8px; align-items: flex-end; padding: 12px; border-top: 1px solid var(--line); background: var(--card); }
+  .compose textarea { flex: 1; min-width: 0; min-height: 44px; max-height: 120px; resize: none; padding: 11px 14px;
+                      border-radius: 16px; border: 1px solid var(--line); background: var(--bg); color: var(--ink);
+                      font: inherit; font-size: 14px; line-height: 1.45; }
+  .compose button { height: 44px; padding: 0 18px; }
+  .chat .error { padding: 0 14px 10px; background: var(--card); }
+
+  dialog { border: 1px solid var(--line); border-radius: 22px; background: var(--card); color: var(--ink);
+           width: min(520px, calc(100vw - 32px)); padding: 22px; }
+  dialog::backdrop { background: rgba(23, 33, 29, .4); }
+  dialog h2 { margin-bottom: 6px; }
+  label { display: block; font-size: 13px; font-weight: 600; color: var(--muted); margin-top: 12px; }
+  label input, label textarea { display: block; width: 100%; margin-top: 5px; padding: 10px 12px; border-radius: 14px;
+         border: 1px solid var(--line); background: var(--bg); color: var(--ink); font: inherit; font-weight: 400; font-size: 14px; }
+  textarea { min-height: 60px; resize: vertical; }
   .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
   .notice { font-size: 13px; color: var(--muted); }
   .error { color: var(--red); font-size: 13px; min-height: 1em; }
@@ -73,12 +157,16 @@
 </head>
 <body>
 <header>
-  <h1>🌱 PlantTalk</h1>
-  <p>식물이 직접 말해주는 스마트 화분 관리</p>
+  <div class="logo" aria-hidden="true">🌱</div>
+  <div>
+    <h1>PlantTalk</h1>
+    <p>식물이 직접 말해주는 스마트 화분</p>
+  </div>
+  <div class="weather" id="weather" hidden title="바깥 날씨"></div>
 </header>
 <main>
   <section>
-    <div class="plant-head" style="margin-bottom:10px">
+    <div class="section-head">
       <h2>내 식물</h2>
       <button id="add">+ 식물 추가</button>
     </div>
@@ -86,11 +174,17 @@
     <p class="notice" id="unknown"></p>
   </section>
   <section class="card chat">
-    <h2>단체 채팅방</h2>
-    <div class="log" id="log"></div>
+    <div class="chat-head">
+      <div>
+        <div class="title">우리집 식물 단톡방</div>
+        <div class="sub" id="chat-sub"></div>
+      </div>
+      <div class="members" id="members"></div>
+    </div>
+    <div class="log" id="log" aria-live="polite"></div>
     <form class="compose" id="compose">
-      <input id="text" placeholder="식물들에게 말 걸기…" autocomplete="off">
-      <button class="primary">보내기</button>
+      <textarea id="text" rows="1" placeholder="식물들에게 말 걸기…" aria-label="메시지"></textarea>
+      <button class="primary">전송</button>
     </form>
     <div class="error" id="chat-error"></div>
   </section>
@@ -106,7 +200,7 @@
     <label>성격 <textarea name="personality"></textarea></label>
     <label>말투 <textarea name="speechStyle"></textarea></label>
     <label>예시 대사 <input name="sampleLine"></label>
-    <label>아바타 이미지 URL (Discord) <input name="avatarUrl"></label>
+    <label>아바타 이미지 URL <input name="avatarUrl"></label>
     <div class="grid3">
       <label>바싹 마름 &lt; % <input name="dry" type="number" min="0" max="100"></label>
       <label>목마름 &lt; % <input name="thirsty" type="number" min="0" max="100"></label>
@@ -158,6 +252,8 @@ function el(tag, attrs = {}, ...children) {
   return node;
 }
 
+const hhmm = (d) => d.toLocaleTimeString("ko-KR", { hour: "numeric", minute: "2-digit" });
+
 function ago(iso) {
   const m = Math.round((Date.now() - new Date(iso)) / 60000);
   if (m < 1) return "방금";
@@ -166,21 +262,59 @@ function ago(iso) {
   return `${Math.round(m / 1440)}일 전`;
 }
 
-function sparkline(history) {
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("class", "spark");
-  svg.setAttribute("viewBox", "0 0 100 40");
-  svg.setAttribute("preserveAspectRatio", "none");
-  if (history.length < 2) return svg;
-  const pts = history.map((r, i) => `${(i / (history.length - 1)) * 100},${40 - (r.moisture / 100) * 38 - 1}`).join(" ");
-  const line = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
-  line.setAttribute("points", pts);
-  line.setAttribute("fill", "none");
-  line.setAttribute("stroke", "var(--green)");
-  line.setAttribute("stroke-width", "1.5");
-  line.setAttribute("vector-effect", "non-scaling-stroke");
-  svg.append(line);
-  return svg;
+// 0~100% 값 하나를 시간 순으로 그리는 작은 선 그래프. 마우스를 올리면 그 시점의 시간과 값을 보여 준다.
+function miniChart(history, { key, label, color }) {
+  const NS = "http://www.w3.org/2000/svg";
+  const svgEl = (tag, attrs) => {
+    const n = document.createElementNS(NS, tag);
+    for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+    return n;
+  };
+  const pts = history.filter((r) => typeof r[key] === "number");
+  const last = pts.at(-1);
+  const box = el("div", { class: "mini" },
+    el("div", { class: "mini-head" },
+      el("span", {}, el("span", { class: "key", style: `background:${color}` }), label),
+      el("b", {}, last ? `${Math.round(last[key])}%` : "–")));
+  const svg = svgEl("svg", { viewBox: "0 0 100 40", preserveAspectRatio: "none", role: "img",
+    "aria-label": `${label} 추이${last ? `, 최근 ${Math.round(last[key])}%` : ""}` });
+  // 50% 기준선만 옅게
+  svg.append(svgEl("line", { x1: 0, x2: 100, y1: 20, y2: 20, stroke: "var(--line)", "stroke-width": 1, "vector-effect": "non-scaling-stroke" }));
+  box.append(svg);
+  if (pts.length < 2) return box;
+
+  const x = (i) => (i / (pts.length - 1)) * 100;
+  const y = (v) => 39 - (Math.max(0, Math.min(100, v)) / 100) * 38;
+  svg.append(svgEl("polyline", { points: pts.map((r, i) => `${x(i)},${y(r[key])}`).join(" "), fill: "none",
+    stroke: color, "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round", "vector-effect": "non-scaling-stroke" }));
+  const cross = svgEl("line", { y1: 0, y2: 40, stroke: "var(--muted)", "stroke-width": 1, "vector-effect": "non-scaling-stroke", visibility: "hidden" });
+  svg.append(cross);
+  const tip = el("div", { class: "tip", hidden: "" });
+  box.append(tip, el("div", { class: "range" }, el("span", {}, hhmm(new Date(pts[0].ts))), el("span", {}, hhmm(new Date(last.ts)))));
+
+  svg.addEventListener("pointermove", (e) => {
+    const rect = svg.getBoundingClientRect();
+    const i = Math.round(((e.clientX - rect.left) / rect.width) * (pts.length - 1));
+    const r = pts[Math.max(0, Math.min(pts.length - 1, i))];
+    const px = x(pts.indexOf(r));
+    cross.setAttribute("x1", px);
+    cross.setAttribute("x2", px);
+    cross.setAttribute("visibility", "visible");
+    tip.hidden = false;
+    tip.textContent = `${hhmm(new Date(r.ts))} · ${Math.round(r[key])}%`;
+    tip.style.left = `${Math.max(30, Math.min(rect.width - 30, (px / 100) * rect.width))}px`;
+  });
+  svg.addEventListener("pointerleave", () => { cross.setAttribute("visibility", "hidden"); tip.hidden = true; });
+  return box;
+}
+
+// 센서가 보내는 원시 값들. 칩 온도는 ESP32 내부 온도라 실내 기온보다 높다.
+function sensorDetails(r) {
+  const parts = [`흙 ${r.soilVoltage}V`, `배터리 ${r.batteryVoltage}V`];
+  if (r.chipTemp != null) parts.push(`칩 온도 ${r.chipTemp}°C`);
+  if (r.rssi != null) parts.push(`${r.transport === "ble" ? "BLE" : "Wi-Fi"} ${r.rssi}dBm`);
+  if (r.uptime != null) parts.push(`가동 ${Math.floor(r.uptime / 60)}분`);
+  return parts.join(" · ");
 }
 
 function renderPlants(data) {
@@ -189,20 +323,26 @@ function renderPlants(data) {
   box.replaceChildren(...plants.map((p) => {
     const r = p.latest;
     const slider = el("input", { type: "range", min: 0, max: 100, value: r ? Math.round(r.moisture) : 50 });
-    const sliderValue = el("span", {}, `${slider.value}%`);
+    const sliderValue = el("span", { class: "num" }, `${slider.value}%`);
     slider.addEventListener("input", () => (sliderValue.textContent = `${slider.value}%`));
     return el("div", { class: "card" },
       el("div", { class: "plant-head" },
         el("div", {}, el("b", {}, p.name), " ", el("span", { class: "species" }, p.species)),
         el("span", { class: `badge s-${r ? r.status : "none"}` }, r ? STATUS[r.status] : "데이터 없음")),
-      el("div", { class: "moisture" }, r ? `${r.moisture}` : "–", el("small", {}, " % 흙 수분")),
+      el("div", { class: "moisture" }, el("span", { class: "num" }, r ? `${r.moisture}` : "–"), el("small", {}, "% 흙 수분")),
       el("div", { class: "meta" },
         r ? `${ago(r.ts)} 측정 · 배터리 ${r.battery}% · 기기 ${p.deviceId || "미연결"}` : `기기 ${p.deviceId || "미연결"}`),
-      sparkline(p.history),
+      r && r.soilVoltage != null ? el("div", { class: "meta" }, sensorDetails(r)) : null,
+      ...(p.history.length
+        ? [miniChart(p.history, { key: "moisture", label: "흙 수분", color: "var(--chart-moisture)" }),
+           miniChart(p.history, { key: "battery", label: "배터리", color: "var(--chart-battery)" })]
+        : [el("div", { class: "no-data" }, "아직 센서 기록이 없어요.\n센서를 연결하거나 아래 시뮬레이션으로 값을 보내 보세요.")]),
       el("div", { class: "sim" }, "시뮬레이션", slider, sliderValue,
         el("button", { onclick: () => simulate(p.id, slider.value) }, "보내기")),
       el("div", { class: "row" }, el("button", { onclick: () => openEditor(p) }, "캐릭터 설정")));
   }));
+
+  renderMembers();
 
   const unknown = Object.keys(data.unknownDevices || {});
   document.getElementById("unknown").textContent = unknown.length
@@ -229,32 +369,98 @@ function alertError(e) {
   document.getElementById("chat-error").textContent = e.message;
 }
 
-const log = document.getElementById("log");
-async function loadChat() {
-  const { messages } = await api(`/api/chat?after=${lastChatId}`);
-  if (!messages.length) return;
-  const stick = lastChatId === 0 || log.scrollHeight - log.scrollTop - log.clientHeight < 40;
-  for (const m of messages) {
-    lastChatId = m.id;
-    log.append(el("div", { class: `msg ${m.role}` },
-      el("div", { class: "who" }, `${m.author}${m.source && m.source !== "web" ? ` · ${m.source}` : ""}`),
-      el("div", { class: "bubble" }, m.text)));
+// ---- 채팅방
+const AVATAR_COLORS = ["#4f8a5b", "#c0763a", "#6a6fc0", "#b0507a", "#3a8a99", "#8a7a2f"];
+
+function avatar(plant, fallbackName) {
+  const box = el("div", { class: "avatar" });
+  if (plant?.avatarUrl) {
+    box.append(el("img", { src: plant.avatarUrl, alt: "" }));
+  } else {
+    const i = Math.max(0, plants.findIndex((p) => p.id === plant?.id));
+    box.style.background = AVATAR_COLORS[i % AVATAR_COLORS.length];
+    box.textContent = plant ? "🌿" : (fallbackName || "?").slice(0, 1);
   }
-  if (stick) log.scrollTop = log.scrollHeight;
+  return box;
 }
 
-document.getElementById("compose").addEventListener("submit", async (e) => {
+function renderMembers() {
+  const box = document.getElementById("members");
+  box.replaceChildren(...plants.map((p) => {
+    const a = avatar(p);
+    a.title = `${p.name} · ${p.latest ? STATUS[p.latest.status] : "데이터 없음"}`;
+    a.append(el("span", { class: `dot s-${p.latest ? p.latest.status : "none"}` }));
+    return a;
+  }));
+  document.getElementById("chat-sub").textContent = `식물 ${plants.length} · ${config.owner || "주인"}`;
+}
+
+const log = document.getElementById("log");
+const typingRow = el("div", { class: "msg", hidden: "" },
+  el("div", { class: "avatar", style: "background:var(--line)" }, "🌱"),
+  el("div", { class: "body" }, el("div", { class: "bubble typing", "aria-label": "식물들이 입력 중" }, el("i"), el("i"), el("i"))));
+log.append(typingRow);
+let prevMsg = null;
+
+const dayLabel = (d) => d.toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric", weekday: "long" });
+
+function renderMessage(m) {
+  const at = new Date(m.ts);
+  if (!prevMsg || new Date(prevMsg.ts).toDateString() !== at.toDateString()) {
+    log.insertBefore(el("div", { class: "day" }, dayLabel(at)), typingRow);
+    prevMsg = null;
+  }
+  // 같은 사람이 3분 안에 이어서 말하면 아바타와 이름을 생략한다
+  const cont = prevMsg && prevMsg.role === m.role && prevMsg.author === m.author && at - new Date(prevMsg.ts) < 3 * 60 * 1000;
+  const plant = m.role === "plant" ? plants.find((p) => p.id === m.plantId) : null;
+  const via = m.source && m.source !== "web" ? ` · ${m.source}` : "";
+  log.insertBefore(el("div", { class: `msg ${m.role}${cont ? " cont" : ""}` },
+    m.role === "owner" ? null : avatar(plant, m.author),
+    el("div", { class: "body" },
+      cont || m.role === "owner" ? null : el("div", { class: "who" }, m.author),
+      el("div", { class: "line" }, el("div", { class: "bubble" }, m.text), el("span", { class: "time" }, hhmm(at) + via)))),
+    typingRow);
+  prevMsg = m;
+}
+
+async function loadChat() {
+  const { messages, typing } = await api(`/api/chat?after=${lastChatId}`);
+  const stick = lastChatId === 0 || log.scrollHeight - log.scrollTop - log.clientHeight < 60;
+  for (const m of messages) {
+    lastChatId = m.id;
+    renderMessage(m);
+  }
+  typingRow.hidden = !typing;
+  const empty = log.querySelector(".empty");
+  if (prevMsg && empty) empty.remove();
+  if (!prevMsg && !empty) log.prepend(el("div", { class: "empty" }, "아직 대화가 없어요.\n식물들에게 먼저 말을 걸어 보세요."));
+  if (stick && (messages.length || typing)) log.scrollTop = log.scrollHeight;
+}
+
+const composeForm = document.getElementById("compose");
+const input = document.getElementById("text");
+const autosize = () => { input.style.height = "auto"; input.style.height = `${input.scrollHeight + 2}px`; };
+input.addEventListener("input", autosize);
+// Enter 로 보내고 Shift+Enter 로 줄바꿈. 한글 조합 중에 누른 Enter 는 무시한다.
+input.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing && e.keyCode !== 229) {
+    e.preventDefault();
+    composeForm.requestSubmit();
+  }
+});
+composeForm.addEventListener("submit", async (e) => {
   e.preventDefault();
-  const input = document.getElementById("text");
   const text = input.value.trim();
   if (!text) return;
   input.value = "";
+  autosize();
   document.getElementById("chat-error").textContent = "";
   try {
     await api("/api/chat", { method: "POST", body: JSON.stringify({ text }) });
+    typingRow.hidden = false;
     await loadChat();
     log.scrollTop = log.scrollHeight;
-  } catch (err) { alertError(err); input.value = text; }
+  } catch (err) { alertError(err); input.value = text; autosize(); }
 });
 
 const editor = document.getElementById("editor");
@@ -297,11 +503,34 @@ form.addEventListener("submit", async (e) => {
   } catch (err) { document.getElementById("form-error").textContent = err.message; }
 });
 
-async function tick() {
-  try { await Promise.all([loadPlants(), loadChat()]); } catch (e) { console.error(e); }
+async function loadWeather() {
+  const { weather: w, forecast: f, calendar: c } = await api("/api/outdoor");
+  const box = document.getElementById("weather");
+  box.hidden = !w;
+  if (!w) return;
+  // 오늘 최저/최고와 강수확률은 기상청 예보가 있으면 그쪽을 쓴다
+  const today = f?.today ?? { min: w.today.min, max: w.today.max, rainChance: w.today.rain };
+  const parts = [`오늘 ${Math.round(today.min)}° / ${Math.round(today.max)}°`, `비 ${today.rainChance}%`];
+  if (w.air) parts.push(`미세먼지 ${w.air.pm25Grade}`);
+  const off = c?.today.holiday ?? (c?.tomorrow.holiday ? `내일 ${c.tomorrow.holiday}` : null);
+  box.replaceChildren(
+    el("span", { class: "num" }, `${Math.round(w.temp)}°`),
+    el("div", {}, el("b", {}, [w.place, w.label, off].filter(Boolean).join(" · ")), parts.join(" · ")));
+  box.title = `바깥 날씨 (Open-Meteo${f ? ", 기상청 단기예보" : ""})`;
 }
-tick();
-setInterval(tick, 4000);
+
+async function tick() {
+  try {
+    await loadPlants();  // 채팅 아바타가 식물 목록을 쓰므로 먼저
+    await loadChat();
+  } catch (e) { console.error(e); }
+}
+api("/api/config").then((c) => { config = c; }).catch(() => {}).finally(() => {
+  tick();
+  setInterval(tick, 2500);
+  loadWeather().catch(() => {});
+  setInterval(() => loadWeather().catch(() => {}), 5 * 60 * 1000);  // 입력 중 표시와 답장이 빨리 보이도록
+});
 </script>
 </body>
 </html>

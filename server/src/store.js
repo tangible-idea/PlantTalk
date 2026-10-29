@@ -18,6 +18,8 @@ export function createStore(file = DB_FILE) {
   } else {
     db = { plants: JSON.parse(fs.readFileSync(SEED_FILE, "utf8")), readings: {}, chat: [], unknownDevices: {} };
   }
+  db.meta ??= {};
+  const live = {}; // BLE 처럼 자주 오는 값의 최신본. 파일에 쓰지 않는다
   let nextChatId = (db.chat.at(-1)?.id ?? 0) + 1;
 
   function save() {
@@ -50,6 +52,11 @@ export function createStore(file = DB_FILE) {
     readings: (plantId) => db.readings[plantId] ?? [],
     latestReading: (plantId) => db.readings[plantId]?.at(-1),
 
+    liveReading: (plantId) => live[plantId] ?? db.readings[plantId]?.at(-1),
+    setLiveReading(plantId, reading) {
+      live[plantId] = reading;
+    },
+
     addReading(plantId, reading) {
       const list = (db.readings[plantId] ??= []);
       list.push(reading);
@@ -62,6 +69,13 @@ export function createStore(file = DB_FILE) {
       save();
     },
     unknownDevices: () => db.unknownDevices,
+
+    // 아침 인사를 마지막으로 한 날짜 (YYYY-MM-DD)
+    lastMorning: () => db.meta.lastMorning,
+    setLastMorning(date) {
+      db.meta.lastMorning = date;
+      save();
+    },
 
     chat: (afterId = 0) => db.chat.filter((m) => m.id > afterId),
     recentChat: (n) => db.chat.slice(-n),

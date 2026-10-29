@@ -8,11 +8,17 @@
  *   sendAsPlant(plant, text): Promise<void>
  *   relayOwner?(author, text): Promise<void>   다른 채널에서 온 주인 메시지를 이 채널에도 보여줄 때
  */
-export function createHub({ store, planReplies, messengers }) {
+// context: Claude 에 함께 넘길 바깥 맥락(날씨, 대기질, 예보, 공휴일)을 문자열로 돌려주는 함수
+export function createHub({ store, planReplies, messengers, context = () => null }) {
   // Claude 호출이 겹치면 식물들이 서로의 답을 못 보고 말하게 되므로 한 번에 하나씩 처리한다.
   let queue = Promise.resolve();
+  let pending = 0; // 답장을 만드는 중인 작업 수. 채팅방의 "입력 중" 표시에 쓴다
   const enqueue = (job) => {
-    queue = queue.then(job).catch((err) => console.error("[hub] reply failed:", err.message));
+    pending++;
+    queue = queue
+      .then(job)
+      .catch((err) => console.error("[hub] reply failed:", err.message))
+      .finally(() => pending--);
     return queue;
   };
 
@@ -22,6 +28,7 @@ export function createHub({ store, planReplies, messengers }) {
       plants,
       readingsOf: (id) => store.readings(id),
       chat: store.recentChat(30),
+      context: context(),
       trigger,
     });
     for (const { plantId, text } of replies) {
@@ -36,6 +43,8 @@ export function createHub({ store, planReplies, messengers }) {
   }
 
   const hub = {
+    busy: () => pending > 0,
+
     async start() {
       for (const m of messengers) {
         await m.start(({ author, text }) => hub.ownerMessage({ author, text, source: m.name }));
@@ -51,6 +60,11 @@ export function createHub({ store, planReplies, messengers }) {
         }
       }
       return enqueue(() => speak({ type: "owner", text }));
+    },
+
+    // 아침 인사 (morning.js 가 하루 한 번 부른다)
+    morning() {
+      return enqueue(() => speak({ type: "morning" }));
     },
 
     sensorEvents(plant, events) {

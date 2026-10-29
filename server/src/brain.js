@@ -14,7 +14,8 @@ const RULES = `You give voice to the houseplants in a group chat with their owne
 
 How the plants talk:
 - Each plant speaks strictly in its own personality and speech style, like a real person typing in a group chat: one or two short sentences, no narration, no stage directions, no name prefix.
-- A plant only knows its own body through its sensor: soil moisture and how long ago it was measured. Never invent temperature, sunlight, humidity, pests or other things the sensor cannot measure. If a reading is several hours old, the plant can say it isn't sure how it feels right now.
+- A plant only knows its own body through its sensor: soil moisture and how long ago it was measured. Never invent temperature, sunlight, humidity, pests or other things the sensor cannot measure at the pot. If a reading is several hours old, the plant can say it isn't sure how it feels right now.
+- You may also get outdoor context for the owner's area: weather and air quality from a weather service, a Korea Meteorological Administration neighborhood forecast, and today's date with weekends and public holidays. None of it is measured at the pots, which are indoors. Plants can bring it up like news they heard and link it to care: dry air or a hot day dries soil faster, a cold night by the window, bad fine dust means keep the window shut, clean air is a good day to air the room, a day off means the owner might be home. They answer the owner's questions about weather, rain, fine dust or holidays using only what is given, and say so when something is not given. Never present the outdoor numbers as the pot's own temperature or humidity, and never invent forecasts. Do not mention this context in every message; only when it fits or is asked.
 - Treat moisture levels the way a plant would feel them: dry = parched, thirsty = would like water soon, ok = comfortable, soggy = roots feel waterlogged and it should not be watered.
 - Plants can react to each other, tease each other, or agree, as friends in a chat would.
 - Do not reuse a persona's sample line word for word; it only shows the voice.
@@ -23,6 +24,7 @@ How the plants talk:
 Who speaks:
 - For a sensor event, the plant it concerns must speak about it. Another plant may add one short reaction if it fits naturally; usually none.
 - When the owner writes, reply with the plants who have a reason to: those named, those the topic concerns, or everyone if it is addressed to all. If the owner writes to the group in general, at least one plant replies.
+- For the morning greeting, one or two plants say good morning on their own, mention today's weather (and fine dust or a holiday if notable) briefly and in character, and say how they are doing. Keep it light and different from earlier mornings in the chat.
 - Keep the whole turn short: at most one message per plant.`;
 
 function describePlant(plant) {
@@ -90,10 +92,11 @@ function replySchema(plantIds) {
  * @param {object[]} args.plants
  * @param {(plantId: string) => object[]} args.readingsOf
  * @param {object[]} args.chat 최근 채팅 (trigger 가 된 주인 메시지 포함)
- * @param {{type: "owner", text: string} | {type: "sensor", plantId: string, events: string[]}} args.trigger
+ * @param {string | null} [args.context] 바깥 맥락 (날씨·대기질·예보·공휴일)
+ * @param {{type: "owner", text: string} | {type: "sensor", plantId: string, events: string[]} | {type: "morning"}} args.trigger
  * @returns {Promise<{plantId: string, text: string}[]>}
  */
-export async function planReplies({ plants, readingsOf, chat, trigger }) {
+export async function planReplies({ plants, readingsOf, chat, context, trigger }) {
   if (plants.length === 0) return [];
   const now = Date.now();
 
@@ -102,7 +105,9 @@ export async function planReplies({ plants, readingsOf, chat, trigger }) {
   const what =
     trigger.type === "owner"
       ? `The owner just wrote the last message in the chat. Decide who replies.`
-      : `Sensor event for ${trigger.plantId}:\n${trigger.events.map((e) => `- ${e}`).join("\n")}`;
+      : trigger.type === "morning"
+        ? `It is morning (${new Date(now).toLocaleString("ko-KR")}). Nobody has written yet; the plants start the day with a greeting.`
+        : `Sensor event for ${trigger.plantId}:\n${trigger.events.map((e) => `- ${e}`).join("\n")}`;
 
   const response = await client.beta.messages.create({
     model: MODEL,
@@ -118,7 +123,7 @@ export async function planReplies({ plants, readingsOf, chat, trigger }) {
     messages: [
       {
         role: "user",
-        content: `Latest sensor readings:\n${states}\n\nRecent chat:\n${formatChat(chat.slice(-HISTORY_LENGTH))}\n\n${what}`,
+        content: `Latest sensor readings:\n${states}\n\n${context ? `${context}\n\n` : ""}Recent chat:\n${formatChat(chat.slice(-HISTORY_LENGTH))}\n\n${what}`,
       },
     ],
   });
